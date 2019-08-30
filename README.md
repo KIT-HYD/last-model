@@ -1,2 +1,3 @@
 # last-model
-Work in progress
+
+The LAST-model package is not functional yet.
