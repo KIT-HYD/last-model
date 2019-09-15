@@ -1,0 +1,19 @@
+{
+    "parameters": {
+        "rho": 1000,
+        "t_end": 86400,
+        "dtc": 12000,
+        "grid_depth": -1.6,
+        "grid_step": -0.1,
+        "mobile_particle_fraction": "0.1",
+        "total_particles": 1000000,
+        "classes": 800
+    },
+    "model_configuration": {
+        "can_load_from_global": true,
+        "setup": ["Infiltration"],
+        "pre_main": ["PreferentialFlow", "Infiltration"],
+        "post_main": [],
+        "output": []
+    }
+}
