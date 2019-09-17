@@ -7,13 +7,43 @@
         "grid_step": -0.1,
         "mobile_particle_fraction": "0.1",
         "total_particles": 1000000,
-        "classes": 800
+        "classes": 800,
+        "soil": {
+            "ks":2.5e-6,
+            "ths": 0.4,
+            "thr": 0.04,
+            "alph": 1.9,
+            "n_vg": 1.25,
+            "stor": 0.38,
+            "l_lg": 0.5
+        },
+        "tmix": {
+            "ratio": 1.0,
+            "mean1": 120,
+            "mean2": 12000,
+            "SD1": 60,
+            "SD2": 1200
+        },
+        "preferential_flow": {
+            "amount" : 16,
+            "depth": -1.05,
+            "depth_step": -0.05,
+            "diameter_mm": 5,
+            "total_particles": 10000
+        }
     },
     "model_configuration": {
         "can_load_from_global": true,
-        "setup": ["Infiltration"],
-        "pre_main": ["PreferentialFlow", "Infiltration"],
+        "setup": ["PreferentialFlow"],
+        "pre_main": ["Infiltration"],
         "post_main": [],
         "output": []
+    },
+    "data": {
+        "precipitation": "./example/source/boundarycon/prec_int_specht.csv",
+        "precipitation_concentration": "./example/source/boundarycon/prec_conc_specht.csv",
+        "soil_moisture": [[0.274, 0.0, 0.15]],
+        "concentration": [[0, 0.0, 0.1], [0, 0.1, 1.5]],
+        "concentration_final": "./example/source/initial_states/conc_final_specht.csv"
     }
 }

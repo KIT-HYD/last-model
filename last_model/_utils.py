@@ -7,9 +7,12 @@ from datetime import datetime as dt
 class ConfigBaseMixin:
     identifier = None
 
-    def __init__(self, path=None):
+    def __init__(self, Last, path=None):
         if self.identifier is None:
             raise RuntimeError('Do not use ConfBaseMixin directly. Overwrite identifier, to mark file keyword to use.')
+        
+        # Last model reference
+        self.last = Last
 
         # if no path is given, the current directory is assumed
         if path is None:
@@ -73,11 +76,16 @@ class ExtensionBase:
     configuration done by the user in the appropiate places.
 
     """
+    identifier = None
+
     def __init__(self, Last):
         # bind the model
         self.last = Last
         self.params = Last.params  
-        self.id = uuid.uuid4()
+        
+        # set a unique identifier, if still None
+        if self.identifier is None:
+            self.identifier = uuid.uuid4()
 
     def _init_last(self):
         msg = '[%s] %s init_last function.'
@@ -89,7 +97,7 @@ class ExtensionBase:
             msg += ' Not defined.'
         
         # append to workflow
-        self.last.workflow.append(msg % (str(dt.now()), self.id))
+        self.last.workflow.append(msg % (str(dt.now()), self.identifier))
 
     def _setup(self):
         msg = '[%s] %s setup function.'
@@ -101,7 +109,7 @@ class ExtensionBase:
             msg += ' Not defined.'
         
         # append to workflow
-        self.last.workflow.append(msg % (str(dt.now()), self.id))
+        self.last.workflow.append(msg % (str(dt.now()), self.identifier))
 
     def _run(self):
         msg = '[%s] %s run function.'
@@ -113,4 +121,4 @@ class ExtensionBase:
             msg += ' Not definded.'
         
         # append to workflow
-        self.last.workflow.append(msg % (str(dt.now()), self.id))
+        self.last.workflow.append(msg % (str(dt.now()), self.identifier))
