@@ -5,7 +5,7 @@
         "dtc": 12000,
         "grid_depth": -1.6,
         "grid_step": -0.1,
-        "mobile_particle_fraction": "0.1",
+        "mobile_particle_fraction": 0.1,
         "total_particles": 1000000,
         "classes": 800,
         "soil": {
