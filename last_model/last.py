@@ -12,6 +12,13 @@ from .init_functions import (
     init_particles,
     init_particles_pos
 )
+from .model_functions import (
+    displ_mtx_pre,
+    displ_mtx_event,
+    displ_pfd,
+    mixing_mtx,
+    mixing_pfd_mtx
+)
 
 
 class Last:
@@ -72,6 +79,9 @@ class Last:
         self.dtc = self.params.get('dtc')
         self.time = 0
 
+        # controls the displacement routine
+        self.pc = None 
+
         # profiling - as of now just runtime
         self.instance_creation = dt.now()
         self.main_start = None
@@ -83,6 +93,13 @@ class Last:
         self.dz = np.abs(np.diff(self.z))
         self.dim = self.z.size
 
+        # grid should be defined here, so load data
+        # TODO: maybe not calculate the grid, but make it input data?
+        #--------------------------------------
+        # READ DATA
+        #--------------------------------------
+        self.read_data()
+
         # soil parameters
         # TODO: die Namen sollten angepasst werden
         soil = self.params.get('soil')
@@ -92,7 +109,7 @@ class Last:
         self.alph = soil.get('alph')
         self.n_vg = soil.get('n_vg')
         self.stor = soil.get('stor')
-        self.l_lg = soil.get('l_lg')
+        self.l_vg = soil.get('l_vg')
         
         # particle settings
         self.mob_fak = self.params.get('mobile_particle_fraction')
@@ -164,7 +181,7 @@ class Last:
         self.K_table = np.zeros((1, self.nclass))
 
         # soil moisture bins
-        self.theta_table = np.arange(self.thr, self.ths, ((self.ths - self.ths) / self.nclass)).transpose()
+        self.theta_table = np.arange(self.thr, self.ths, ((self.ths - self.thr) / self.nclass)).transpose()
 
         # calculate initial psi from initial soil moisture
         for i in range(self.nclass):
@@ -176,6 +193,7 @@ class Last:
         self.k = self.k_init
         self.c = self.c_init
         self.psi = self.psi_init
+        self.theta = self.theta_init
         self.Cw = self.Cw_init
 
         #-----------------------------------
@@ -186,10 +204,13 @@ class Last:
 
         # initialises particle positions and initial particle concentrations, particle ages, retarded and degraded particle solute concentration
         self.position_z, self.c_particle = init_particles_pos(z=self.z, dim=self.dim, n=self.n, Cw_init=self.Cw_init)
+        
+        # TODO: Why?
+        self.position_z = np.round(self.position_z, 3)
         self.age_particle = np.zeros((self.position_z.size, 1))
 
         # TODO: ui ui. Das machen wir anders
-        self.position_z = pd.concat([pd.DataFrame(self.position_z), pd.DataFrame(self.age_particle), pd.DataFrame(c_particle)], axis=1)
+        self.position_z = pd.concat([pd.DataFrame(self.position_z), pd.DataFrame(self.age_particle), pd.DataFrame(self.c_particle)], axis=1)
         self.position_z = self.position_z.values
 
         # initial input conditions at soil surface
@@ -199,12 +220,6 @@ class Last:
         self.qb_u = -0.5 * (self.prec_int[0] + self.prec_int[1])
 
         # TODO plot settings are skipped for now...
-
-
-        #--------------------------------------
-        # READ DATA
-        #--------------------------------------
-        self.read_data()
 
         # time settings
         # TODO: here, I break with the original code, as the data 
@@ -216,9 +231,6 @@ class Last:
         self.t_end = self.t_end + self.time
         self.t_boundary = self.prec_time # TODO why exactly do we need it twice? ref. init_LAST.py lines 111 to 114
         self.i_time = 1
-
-
-
 
         # EXTENSION initialization
         # As a last step - run the init functions
@@ -240,8 +252,7 @@ class Last:
             self.D_table[0][ibin] = k_help[0] / c_h[0]
         else:
             self.D_table[0][ibin] = 0
-        self.K_table[0][i] = k_help[0]
-
+        self.K_table[0][ibin] = k_help[0]
 
     def read_data(self):
         """
@@ -302,4 +313,129 @@ class Last:
             instance._run()
 
     def main(self):
-        pass
+        """Main Routine
+
+        This function is run on each iteration until the break 
+        condition is met. The Pre-Main classes are executed before
+        this method is called and the Post-Main classes are 
+        executed afterwards. In case particle dispalcement itself
+        shall be intercepted, the follwoing lifecycle functions are
+        available.
+
+        The main difference between a pre-main class extension 
+        and the pre-dispalcement hook is that the hook is 
+        also run twice on each displacement and the pc parameter 
+        is already set.
+
+        Lifecycle:
+        ----------
+
+        1. Pre Particle displacement        [main_pre_displacement]
+        2. Particle displacement            [main_displacement]
+        3. Post particle displacement       [main_post_displacement]
+        4. Mixing of matrix and macropores  [main_mixing]
+        5. finalizing                       [main_finalizing]
+
+        """
+        self.pc = 0
+        # run the displacement twice on half depth
+        # TODO: is there a more elegant way?
+        for pc in range(0,2):
+            self.pc = pc
+
+            # TODO: here, we could add profiling options in verbose mode
+            # pre-displacement
+            self.main_pre_displacement()
+
+            # displacement routine
+            self.main_displacement()
+
+            # post displacement, with pc still in state
+            self.main_post_displacement()
+
+        # reset pc again
+        self.pc = None
+
+        # particle mixing
+        self.main_mixing()
+
+        # finish this iteration
+        self.main_finalizing()
+
+    def main_pre_displacement(self):
+        """ 
+        setup advective velocity and diffusivity from parameters
+        then, set to 0 in each grid cell where the soil moisture 
+        is close to thr (residual soil moisture)
+
+        """
+        # Step 1: initialisation of parameters v and D
+        
+        # advective velocity in each grid element of the soil matrix
+        self.v = 1 * self.k
+        # diffusivity in each grid element of the soil matrix
+        self.D = 1 * self.k / self.c
+        
+        # finds all grid elements with a soil moisture near to thr (almost dry soil)
+        # sets the velocity and diffusivity in this grid elements to 0-> no flux!
+        ipres = self.theta < 1.1 * self.thr
+        if ipres.any() == True:
+            self.v[ipres==True] = 0
+            self.D[ipres==True] = 0
+
+    def main_displacement(self):
+        """
+        Displace the particles 
+        """
+        # displacement of pre-event particles in soil marix
+        self.Cw, self.mtx_avg_age, self.position_z, self.theta = displ_mtx_pre(D=self.D, dim=self.dim, dtc=(0.5*self.dtc), D_table=self.D_table, dz=self.dz, K_table=self.K_table, m=self.m, mob_fak=self.mob_fak, position_z=self.position_z, ths=self.ths, v=self.v, z=self.z)
+
+        # displacement of event particles in soil matrix
+        if self.position_z_event.size > 0:
+            self.position_z_event, self.theta_event = displ_mtx_event(dim=self.dim, dtc=(0.5*self.dtc), D_table=self.D_table, K_table=self.K_table, m=self.m, dz=self.dz, position_z_event=self.position_z_event, prob=self.prob, ths=ths, z=z)
+        
+        # displacement of particles in pfd and drainage; only one times in the predictor step because it is just dependent on constant advective veloscity
+        if self.pc == 0 and np.isnan(self.pfd_position_z).all() == False:
+            self.pfd_particles, self.pfd_Cw, self.pfd_theta, self.pfd_position_z = displ_pfd(n_mak=self.n_mak, pfd_dim=self.pfd_dim, pfd_dz=self.pfd_dz, pfd_m=self.pfd_m, pfd_n=self.pfd_n, pfd_position_z=self.pfd_position_z, pfd_r=self.pfd_r, pfd_z=self.pfd_z)       
+
+    def main_post_displacement(self):
+        """
+        The psi, c and k parameters are recalculated after displacement
+        """
+        # update of parameters psi, c and k for the corrector step
+        self.psi, self.c = psi_theta(alph=self.alph, dim=self.dim, n_vg=self.n_vg, stor=self.stor, theta=self.theta, thr=self.thr, ths=self.ths)
+        self.k = k_psi(alph=self.alph, dim=self.dim, ks=self.ks, l_vg=self.l_vg, n_vg=self.n_vg, psi=self.psi)
+ 
+    def main_mixing(self):
+        """
+        Mixing of event particle with pre-event particles 
+        within the first grid elements of soil matrix
+        """
+        # TODO: when is that not true?
+        if self.position_z_event.size > 0:
+            self.age_event, self.Cw_event, self.position_z, self.position_z_event = mixing_mtx(age_event=self.age_event, Cw_event=self.Cw_event, position_z=self.position_z, position_z_event=self.position_z_event, time=self.time)
+
+        val_pos = -np.sort(-self.position_z[:,0])
+        idx = np.argsort(-self.position_z[:,0])    
+        
+        # TODO: I don't get this step. this should be made easier
+        self.position_z = np.concatenate((np.reshape(val_pos, (val_pos[:,].size,1)),np.reshape(self.position_z[idx,1],(self.position_z[idx,1].size,1)),np.reshape(self.position_z[idx,2],(self.position_z[idx,2].size,1))), axis=1)               
+    
+        # Mixing between pfd and soil matrix
+        if np.isnan(self.pfd_position_z).all() == False:
+            # TODO: this has to be changed. parameters should be passed differently
+            self.pfd_position_z, self.position_z = mixing_pfd_mtx(dtc=self.dtc, k=self.k, ks=self.ks, m=self.m, mak_sml=self.mak_sml, mak_mid=self.mak_mid, n_mak=self.n_mak, particle_contact_grid=self.particle_contact_grid, pfd_dim=self.pfd_dim, pfd_dz=self.pfd_dz, pfd_m=self.pfd_m, pfd_n=self.pfd_n, pfd_particles=self.pfd_particles, pfd_position_z=self.pfd_position_z, pfd_r=self.pfd_r, pfd_theta=self.pfd_theta, pfd_z=self.pfd_z, position_z=self.position_z, psi=self.psi, rate_big=self.rate_big, rate_mid=self.rate_mid, rate_sml=self.rate_sml, rho=self.rho, theta=self.theta, ths=self.ths, z=self.z)
+ 
+    def main_finalizing(self):
+        """
+        Update input conditions at the top of the soil
+        """
+        # finds actual position in boundary conditions time series
+        ipos = np.where(self.t_boundary <= self.time)[0][-1] 
+        
+        # updates flux density of precipitation water input
+        self.qb_u = -0.5 * (self.prec_int[ipos,] + self.prec_int[ipos + 1,])
+        
+        # updates the concentration of precipitation water input 
+        self.Cw_eventparticles = self.prec_conc[ipos,] 
+

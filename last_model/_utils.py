@@ -105,8 +105,11 @@ class ExtensionBase:
         # run the user defined function
         try:
             self.setup()
-        except AttributeError:
-            msg += ' Not defined.'
+        except AttributeError as e:
+            if "has no attribute 'setup'" in str(e):
+                msg += ' Not defined.'
+            else:
+                raise e
         
         # append to workflow
         self.last.workflow.append(msg % (str(dt.now()), self.identifier))
