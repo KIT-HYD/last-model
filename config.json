@@ -29,7 +29,12 @@
             "depth": -1.05,
             "depth_step": -0.05,
             "diameter_mm": 5,
-            "total_particles": 10000
+            "total_particles": 10000,
+            "mak_mid": -0.8,
+            "mak_sml": -0.5,
+            "rate_big": 0.13,
+            "rate_mid": 0.19,
+            "rate_sml": 0.68
         }
     },
     "model_configuration": {
