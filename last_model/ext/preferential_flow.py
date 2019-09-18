@@ -108,7 +108,7 @@ class PreferentialFlow(ExtensionBase):
         self.last.particle_contact = np.floor(self.last.U_eventgrid / self.last.pfd_D_particle)
 
         # amount of rows fitting over each other  
-        self.anzahl_reihen = np.floor(self.last.pfd_dz[0] / self.last.pfd_D_particle) 
+        self.last.anzahl_reihen = np.floor(self.last.pfd_dz[0] / self.last.pfd_D_particle) 
 
         # amount of particles having contact to lateral surface of grid element
         self.last.particle_contact_grid = self.last.particle_contact * self.last.anzahl_reihen 
@@ -126,7 +126,7 @@ class PreferentialFlow(ExtensionBase):
         self.last.pfd_qmak = 2884.2 *(self.last.pfd_r**2) 
         
         # advective velocity of a particle 
-        self.pfd_v = self.last.pfd_qmak 
+        self.last.pfd_v = self.last.pfd_qmak 
         
         # hydraulic conductivity
         # TODO: why is this duplicated?
