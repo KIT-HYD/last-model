@@ -39,7 +39,7 @@
     },
     "model_configuration": {
         "can_load_from_global": true,
-        "setup": ["PreferentialFlow"],
+        "setup": ["PreferentialFlow", "Infiltration"],
         "pre_main": ["Infiltration"],
         "post_main": [],
         "output": []
