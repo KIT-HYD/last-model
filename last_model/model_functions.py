@@ -12,10 +12,10 @@ def infilt_mtx(t_mix_mean2,t_mix_SD2,t_mix_mean1,t_mix_SD1,t_mix_ratio, age_even
   
         precip_particles = np.floor(m_input1 / m).astype(int) # amount of event particles to be injected, converts the mass input to number of particles
         bla = bla + (precip_particles * m) # counter for amount of water totally infiltrating the soil matrix
-        m_surface = m_surface - m_input1 # updates water surface storage
-        m_slt_surface = m_slt_surface - (Cw_eventparticles * (m_input1 / rho)) # updates solute mass surface storage
-        solute_test = solute_test + (Cw_eventparticles * (m_input1 / rho)) # counter for amount of solutes totally infiltrating the soil matrix within the first scenario
-        m_input = m_input1 - (precip_particles * m) # calculates the remaining water particles, which where not considered by the "floor" function, and converts them back into a mass (in mm) to add it in the next time step. So no water input gets lost
+        m_surface = (m_surface - m_input1) + (m_input1 - (precip_particles*m)) # updates water surface storage
+        m_slt_surface = (m_slt_surface - (Cw_eventparticles*(m_input1/rho))) + (Cw_eventparticles*((m_input1 - (precip_particles*m))/rho)) # updates solute mass surface storage
+        solute_test = solute_test + (Cw_eventparticles*((precip_particles*m)/rho)) # counter for amount of solutes totally infiltrating the soil matrix within the first scenario
+        #m_input = m_input1 - (precip_particles * m) # calculates the remaining water particles, which where not considered by the "floor" function, and converts them back into a mass (in mm) to add it in the next time step. So no water input gets lost
         precip_position = z[0] * np.ones((precip_particles[0],1)) # in every time step the new infiltrating particles get the position z(1)
         theta_count = 1 # sets scenario counter to 1, thus the routine will not run through the subsequent scenarios
         theta[0] = np.round(theta[0] + (precip_particles * m) / (rho*dz[0]*1),4) # updates the soil moisture of the first grid element
@@ -41,16 +41,16 @@ def infilt_mtx(t_mix_mean2,t_mix_SD2,t_mix_mean1,t_mix_SD1,t_mix_ratio, age_even
         else:
             position_z_event = position_z_event_new
 
-    return age_event, bla, Cw_event, m_input, m_slt_surface, m_surface, position_z_event, solute_test, theta, theta_count
+    return age_event, bla, Cw_event, m_slt_surface, m_surface, position_z_event, solute_test, theta, theta_count
 
 ## pfd infiltration routine
-def infilt_pfd(bla1, Cw_eventparticles, m_input, m_input2, m_slt_surface, m_surface, n_mak, pfd_dz, pfd_m, pfd_position_z, pfd_r, pfd_theta, pfd_z, rho, solute_test2, theta_count, time):
+def infilt_pfd(bla1, Cw_eventparticles, m_input2, m_slt_surface, m_surface, n_mak, pfd_dz, pfd_m, pfd_position_z, pfd_r, pfd_theta, pfd_z, rho, solute_test2, theta_count, time):
     if (m_input2 > pfd_m) and (pfd_theta[0] < 1):
     
         pfd_theta_diff = 1 - pfd_theta[0] # detects the amount of water the first grid element of the pfd can gather in this time step
         precip_particles = np.floor(m_input2 / pfd_m).astype(int) # amount of event particles to be injected, converts the mass input to number of particles
-        m_surface = m_surface - m_input2 # updates water surface storage
-        m_input = m_input2 -(precip_particles * pfd_m) # calculates the remaining water particles, which where not considered by the "floor" function, and converts them back into a mass (in mm) to add it in the next time step. So no water input gets lost
+        m_surface = (m_surface - m_input2) + (m_input2-(precip_particles*pfd_m)) # updates water surface storage
+        #m_input = m_input2 -(precip_particles * pfd_m) # calculates the remaining water particles, which where not considered by the "floor" function, and converts them back into a mass (in mm) to add it in the next time step. So no water input gets lost
         theta_count = 1 # sets scenario counter to 1, thus the routine will not run through the subsequent scenarios
         pfd_theta[0]=pfd_theta[0] + ((precip_particles * pfd_m) / ((rho * pfd_dz[0] * np.pi * (pfd_r**2)) * n_mak)) # updates the soil moisture of the first grid element
 
@@ -65,8 +65,8 @@ def infilt_pfd(bla1, Cw_eventparticles, m_input, m_input2, m_slt_surface, m_surf
         if Cw_eventparticles * (m_input2 / rho) > m_slt_surface:
            Cw_eventparticles = m_slt_surface / (m_input2 / rho) 
         
-        m_slt_surface = m_slt_surface - (Cw_eventparticles * (m_input2 / rho)) # updates solute mass surface storage
-        solute_test2 = solute_test2 + (Cw_eventparticles * (m_input2 / rho)) # counter for amount of solutes totally infiltrating the soil matrix within the first scenario
+        m_slt_surface = (m_slt_surface - (Cw_eventparticles*(m_input2/rho))) + (Cw_eventparticles*((m_input2-(precip_particles*pfd_m))/rho)) # updates solute mass surface storage
+        solute_test2 = solute_test2 + (Cw_eventparticles*((precip_particles*pfd_m)/rho)) # counter for amount of solutes totally infiltrating the soil matrix within the first scenario
 
         bla1 = bla1 + (precip_particles * pfd_m) # counter for amount of water totally infiltrating the pfd
         pfd_precip_position = pfd_z[0] * np.ones((precip_particles[0],1)) # in every time step the new infiltrating particles get the position pfd_z(1)
@@ -85,7 +85,7 @@ def infilt_pfd(bla1, Cw_eventparticles, m_input, m_input2, m_slt_surface, m_surf
         else:
             pfd_position_z = pfd_position_z_new
         
-    return bla1, m_input, m_slt_surface, m_surface, pfd_position_z, pfd_theta, solute_test2, theta_count
+    return bla1, m_slt_surface, m_surface, pfd_position_z, pfd_theta, solute_test2, theta_count
 
 ## displacement routine for pre-event particles in matrix
 def displ_mtx_pre(D, dim, dtc, D_table, dz, K_table, m, mob_fak, position_z, ths, v, z):
