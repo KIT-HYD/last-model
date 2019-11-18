@@ -63,9 +63,6 @@ class DataLoader(ConfigBaseMixin):
         # return using array function
         return self._read_from_array(key=key, array=data) 
 
-    def get_unseless_function(self):
-        pass
-
     def _read_from_array(self, key, array):
         if key.lower() == 'precipitation':
             return read_precip(array)
