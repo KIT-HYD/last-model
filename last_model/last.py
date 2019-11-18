@@ -21,6 +21,8 @@ from .model_functions import (
 )
 
 
+# test, insert new, extended version of LAST
+
 class Last:
     def __init__(self, path=None, **kwargs):
         """LAST model 
