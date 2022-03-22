@@ -1,5 +1,7 @@
 # LAST-model
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6375769.svg)](https://doi.org/10.5281/zenodo.6375769)
+
 ## older MATLAB & Python version
 
 The version used in the publication XXX, written in MATLAB, as well as its port to Python
